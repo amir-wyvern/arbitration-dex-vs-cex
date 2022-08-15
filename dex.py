@@ -19,15 +19,15 @@ quote currency : usdt
 
 class DexTrade :
 
-    def __init__(self, public_address, private_address,
+    def __init__(self, public_key, private_key,
         base_token_address, quote_token_address,
         lp_contract, router_contract, slippage= 0.005, endpoint='https://api.s0.t.hmny.io',
         gas_limit= 10165700, gsa_price= 120*10**9 ,):
 
         self.base_token_address = base_token_address
         self.quote_token_address = quote_token_address
-        self.public_address = public_address
-        self.private_address = private_address
+        self.public_key = public_key
+        self.private_key = private_key
         self.slippage = slippage
         self.endpoint = endpoint
         self.gas_limit = gas_limit
@@ -105,13 +105,13 @@ class DexTrade :
                 Web3.toChecksumAddress(input_token_address),
                 Web3.toChecksumAddress(output_token_addrss)
             ],
-            Web3.toChecksumAddress(self.public_address),
+            Web3.toChecksumAddress(self.public_key),
             deadLine
                 )  
         fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,self.w3.codec ,fn_identifier ,args ,())
 
         rawData = prepare_transaction(
-                            self.public_address, 
+                            self.public_key, 
                             self.w3,
                             fn_identifier=fn_identifier,
                             contract_abi=self.pointer_to_router_contract.abi,
@@ -121,10 +121,10 @@ class DexTrade :
                             fn_kwargs=() 
                             )
 
-        nonce = account.get_account_nonce(self.public_address ,block_num='latest' ,endpoint= self.endpoint )
+        nonce = account.get_account_nonce(self.public_key ,block_num='latest' ,endpoint= self.endpoint )
         tx = {  
             'chainId': 1,
-            'from': self.public_address,
+            'from': self.public_key,
             'gas': self.gas_limit,
             'gasPrice': self.gas_price,
             'data': rawData['data'],
@@ -135,7 +135,7 @@ class DexTrade :
             'value': 0
             }
 
-        rawTx = signing.sign_transaction(tx, self.private_address).rawTransaction.hex()
+        rawTx = signing.sign_transaction(tx, self.private_key).rawTransaction.hex()
         resp_hash = transaction.send_raw_transaction(rawTx, self.endpoint )
         logging.info(resp_hash)
         return resp_hash

@@ -23,7 +23,8 @@ class DexTrade :
 
     def __init__(self, public_address, private_address,
         base_token_address, quote_token_address,
-        lp_contract, router_contract, slippage):
+        lp_contract, router_contract, slippage= 0.01, endpoint=None,
+        gas_limit= 10165700, gsa_price= 120*10**9 ,):
 
         self.base_token_address = base_token_address
         self.quote_token_address = quote_token_address
@@ -31,6 +32,9 @@ class DexTrade :
         self.private_address = private_address
         self.w3 = Web3(Web3.HTTPProvider('https://api.s0.t.hmny.io'))
         self.slippage = slippage
+        self.endpoint = endpoint
+        self.gas_limit = gas_limit
+        self.gas_price = gsa_price
 
         self.pointer_to_lp_contract = w3.eth.contract(
             address= Web3.toChecksumAddress(lp_contract['address']),
@@ -118,14 +122,13 @@ class DexTrade :
                             fn_args=args,
                             fn_kwargs=() ) 
 
-        utl = Utils()
-        nonce = account.get_account_nonce(account_handler.getAddress() ,block_num='latest' ,endpoint= utl.get_network() )
+        nonce = account.get_account_nonce(self.public_address ,block_num='latest' ,endpoint= self.endpoint )
 
         tx = {  
             'chainId': 1,
-            'from': account_handler.getAddress(),
-            'gas': utl.configs['gas_limit'],
-            'gasPrice': utl.configs['gas_price'],
+            'from': self.public_address,
+            'gas': self.gas_limit,
+            'gasPrice': self.gas_price,
             'data': rawData['data'],
             'nonce': nonce,
             'shardID': 0,
@@ -134,7 +137,7 @@ class DexTrade :
             'value': 0
             }
 
-        rawTx = signing.sign_transaction(tx, account_handler.getPri()).rawTransaction.hex()
-        resp_hash = transaction.send_raw_transaction(rawTx, utl.get_network() )
-
-
+        rawTx = signing.sign_transaction(tx, self.private_address).rawTransaction.hex()
+        resp_hash = transaction.send_raw_transaction(rawTx, self.endpoint )
+        logging.info(resp_hash)
+        return resp_hash

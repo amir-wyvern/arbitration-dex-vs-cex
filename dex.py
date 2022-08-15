@@ -21,7 +21,7 @@ class DexTrade :
 
     def __init__(self, public_address, private_address,
         base_token_address, quote_token_address,
-        lp_contract, router_contract, slippage= 0.01, endpoint='https://api.s0.t.hmny.io',
+        lp_contract, router_contract, slippage= 0.005, endpoint='https://api.s0.t.hmny.io',
         gas_limit= 10165700, gsa_price= 120*10**9 ,):
 
         self.base_token_address = base_token_address
@@ -61,35 +61,39 @@ class DexTrade :
 
         return int(time()) + 10 * 60
 
-    def calcute_quote_token_with_slippage(self ,base_token_amount):
+    def buy_base_token(self, base_token_amount):
 
         quote_token_amount = self.get_base_token_price() * base_token_amount
         min_quote_token_amount = int((1 - self.slippage) * quote_token_amount)
 
-        return min_quote_token_amount
-
-    def buy_base_token(self, base_token_amount):
-
-        min_quote_token_amount = self.calcute_quote_token_with_slippage(base_token_amount)
         return self._make_trade(
             fn_identifier='swapExactTokensForTokens',
             input_token_amount= base_token_amount,
-            output_token_amount= min_quote_token_amount)
+            output_token_amount= min_quote_token_amount,
+            input_token_address= self.base_token_address,
+            output_token_addrss= self.quote_token_address
+            )
 
     def sell_base_token(self, base_token_amount):
 
-        min_quote_token_amount = self.calcute_quote_token_with_slippage()
+        quote_token_amount = self.get_base_token_price() * base_token_amount
+        max_quote_token_amount = int((1 + self.slippage) * quote_token_amount)
 
         return self._make_trade(
             fn_identifier='swapTokensForExactTokens',
-            input_token_amount= min_quote_token_amount,
-            output_token_amount= base_token_amount)
+            input_token_amount= base_token_amount,
+            output_token_amount= max_quote_token_amount,
+            input_token_address= self.quote_token_address,
+            output_token_addrss= self.base_token_address
+            )
 
     def _make_trade(
         self,
         fn_identifier,
         input_token_amount,
-        output_token_amount
+        output_token_amount,
+        input_token_address,
+        output_token_addrss
         ):
             
         deadLine  = self.get_deadLine() 
@@ -98,8 +102,8 @@ class DexTrade :
             input_token_amount,
             output_token_amount,
             [
-                Web3.toChecksumAddress(self.base_token_address),
-                Web3.toChecksumAddress(self.quote_token_address)
+                Web3.toChecksumAddress(input_token_address),
+                Web3.toChecksumAddress(output_token_addrss)
             ],
             Web3.toChecksumAddress(self.public_address),
             deadLine
@@ -114,7 +118,9 @@ class DexTrade :
                             fn_abi=fn_abi,
                             transaction={'to': self.pointer_to_router_contract.address},
                             fn_args=args,
-                            fn_kwargs=() ) 
+                            fn_kwargs=() 
+                            )
+
         nonce = account.get_account_nonce(self.public_address ,block_num='latest' ,endpoint= self.endpoint )
         tx = {  
             'chainId': 1,

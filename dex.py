@@ -5,8 +5,6 @@ import logging
 from datetime import datetime
 from web3._utils.contracts import prepare_transaction ,find_matching_fn_abi
 from time import time
-from account import Account
-from utils import Utils
 from pyhmy import signing 
 from pyhmy import account
 from pyhmy import transaction
@@ -36,25 +34,25 @@ class DexTrade :
         self.gas_price = gsa_price
 
         self.w3 = Web3(Web3.HTTPProvider(self.endpoint))
-        
-        self.pointer_to_lp_contract = w3.eth.contract(
+
+        self.pointer_to_lp_contract = self.w3.eth.contract(
             address= Web3.toChecksumAddress(lp_contract['address']),
             abi=lp_contract['abi'])
 
-        self.pointer_to_router_contract = w3.eth.contract(
+        self.pointer_to_router_contract = self.w3.eth.contract(
             address= Web3.toChecksumAddress( router_contract['address'] ),
             abi=router_contract['abi'])
 
     def get_base_token_price(self):
 
-        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.getReserves().call()
+        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.functions.getReserves().call()
         base_token_price = qute_token_amount / base_token_amount 
 
         return base_token_price
 
     def get_quote_token_price(self):
 
-        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.getReserves().call()
+        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.functions.getReserves().call()
         qute_token_price = base_token_amount / qute_token_amount
 
         return qute_token_price
@@ -63,20 +61,16 @@ class DexTrade :
 
         return int(time()) + 10 * 60
 
-    def calcute_quote_token_with_slippage(self):
+    def calcute_quote_token_with_slippage(self ,base_token_amount):
 
-        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.getReserves().call()
-        quote_token_price = qute_token_amount / base_token_amount
-        quote_token_amount = int(base_token_amount * quote_token_price ) 
-
-        min_quote_token_amount = (1 - self.slippage) * quote_token_amount
+        quote_token_amount = self.get_base_token_price() * base_token_amount
+        min_quote_token_amount = int((1 - self.slippage) * quote_token_amount)
 
         return min_quote_token_amount
 
     def buy_base_token(self, base_token_amount):
 
-        min_quote_token_amount = self.calcute_quote_token_with_slippage()
-
+        min_quote_token_amount = self.calcute_quote_token_with_slippage(base_token_amount)
         return self._make_trade(
             fn_identifier='swapExactTokensForTokens',
             input_token_amount= base_token_amount,
@@ -108,23 +102,20 @@ class DexTrade :
                 Web3.toChecksumAddress(self.quote_token_address)
             ],
             Web3.toChecksumAddress(self.public_address),
-            daedLine
-                )
-
-        fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,w3.codec ,fn_identifier ,args ,())
+            deadLine
+                )  
+        fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,self.w3.codec ,fn_identifier ,args ,())
 
         rawData = prepare_transaction(
-                            account_handler.getAddress(), 
-                            w3,
+                            self.public_address, 
+                            self.w3,
                             fn_identifier=fn_identifier,
                             contract_abi=self.pointer_to_router_contract.abi,
                             fn_abi=fn_abi,
-                            transaction={'to': self.pointer_to_lp_contract.address},
+                            transaction={'to': self.pointer_to_router_contract.address},
                             fn_args=args,
                             fn_kwargs=() ) 
-
         nonce = account.get_account_nonce(self.public_address ,block_num='latest' ,endpoint= self.endpoint )
-
         tx = {  
             'chainId': 1,
             'from': self.public_address,
@@ -142,3 +133,4 @@ class DexTrade :
         resp_hash = transaction.send_raw_transaction(rawTx, self.endpoint )
         logging.info(resp_hash)
         return resp_hash
+

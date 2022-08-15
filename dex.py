@@ -1,13 +1,9 @@
-from time import sleep ,time ,mktime
-import requests
-from web3 import Web3
-import logging
-from datetime import datetime
 from web3._utils.contracts import prepare_transaction ,find_matching_fn_abi
-from time import time
+from pyhmy import transaction
 from pyhmy import signing 
 from pyhmy import account
-from pyhmy import transaction
+from time import time 
+import logging
 
 
 """
@@ -19,21 +15,20 @@ quote currency : usdt
 
 class DexTrade :
 
-    def __init__(self, public_key, private_key,
+    def __init__(self, web3, account_keys,
         base_token_address, quote_token_address,
-        lp_contract, router_contract, slippage= 0.005, endpoint='https://api.s0.t.hmny.io',
+        lp_contract, router_contract, slippage= 0.005,
         gas_limit= 10165700, gsa_price= 120*10**9 ,):
 
         self.base_token_address = base_token_address
         self.quote_token_address = quote_token_address
-        self.public_key = public_key
-        self.private_key = private_key
+        self.account_keys = account_keys
         self.slippage = slippage
         self.endpoint = endpoint
         self.gas_limit = gas_limit
         self.gas_price = gsa_price
 
-        self.w3 = Web3(Web3.HTTPProvider(self.endpoint))
+        self.w3 = web3
 
         self.pointer_to_lp_contract = self.w3.eth.contract(
             address= Web3.toChecksumAddress(lp_contract['address']),
@@ -105,13 +100,13 @@ class DexTrade :
                 Web3.toChecksumAddress(input_token_address),
                 Web3.toChecksumAddress(output_token_addrss)
             ],
-            Web3.toChecksumAddress(self.public_key),
+            Web3.toChecksumAddress(self.account_keys.public_key),
             deadLine
                 )  
         fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,self.w3.codec ,fn_identifier ,args ,())
 
         rawData = prepare_transaction(
-                            self.public_key, 
+                            self.account_keys.public_key, 
                             self.w3,
                             fn_identifier=fn_identifier,
                             contract_abi=self.pointer_to_router_contract.abi,
@@ -121,10 +116,10 @@ class DexTrade :
                             fn_kwargs=() 
                             )
 
-        nonce = account.get_account_nonce(self.public_key ,block_num='latest' ,endpoint= self.endpoint )
+        nonce = account.get_account_nonce(self.account_keys.public_key ,block_num='latest' ,endpoint= self.endpoint )
         tx = {  
             'chainId': 1,
-            'from': self.public_key,
+            'from': self.account_keys.public_key,
             'gas': self.gas_limit,
             'gasPrice': self.gas_price,
             'data': rawData['data'],
@@ -135,8 +130,10 @@ class DexTrade :
             'value': 0
             }
 
-        rawTx = signing.sign_transaction(tx, self.private_key).rawTransaction.hex()
+        rawTx = signing.sign_transaction(tx, self.account_keys.private_key).rawTransaction.hex()
         resp_hash = transaction.send_raw_transaction(rawTx, self.endpoint )
+        
         logging.info(resp_hash)
+
         return resp_hash
 

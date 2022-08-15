@@ -23,19 +23,20 @@ class DexTrade :
 
     def __init__(self, public_address, private_address,
         base_token_address, quote_token_address,
-        lp_contract, router_contract, slippage= 0.01, endpoint=None,
+        lp_contract, router_contract, slippage= 0.01, endpoint='https://api.s0.t.hmny.io',
         gas_limit= 10165700, gsa_price= 120*10**9 ,):
 
         self.base_token_address = base_token_address
         self.quote_token_address = quote_token_address
         self.public_address = public_address
         self.private_address = private_address
-        self.w3 = Web3(Web3.HTTPProvider('https://api.s0.t.hmny.io'))
         self.slippage = slippage
         self.endpoint = endpoint
         self.gas_limit = gas_limit
         self.gas_price = gsa_price
 
+        self.w3 = Web3(Web3.HTTPProvider(self.endpoint))
+        
         self.pointer_to_lp_contract = w3.eth.contract(
             address= Web3.toChecksumAddress(lp_contract['address']),
             abi=lp_contract['abi'])

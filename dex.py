@@ -1,6 +1,5 @@
 from time import sleep ,time ,mktime
 import requests
-from contracts import load_contracs
 from web3 import Web3
 import logging
 from datetime import datetime
@@ -12,52 +11,130 @@ from pyhmy import signing
 from pyhmy import account
 from pyhmy import transaction
 
+
+"""
+btc/usdt
+
+base currency : btc
+quote currency : usdt
+"""
+
 class DexTrade :
 
-    def __init__(self):
+    def __init__(self, public_address, private_address,
+        base_token_address, quote_token_address,
+        lp_contract, router_contract, slippage):
 
-        self.list_contracts = loadContracs()
+        self.base_token_address = base_token_address
+        self.quote_token_address = quote_token_address
+        self.public_address = public_address
+        self.private_address = private_address
         self.w3 = Web3(Web3.HTTPProvider('https://api.s0.t.hmny.io'))
-        self.slippage = 0.01
-        self.initial_contracts()
+        self.slippage = slippage
 
-    def initial_contracts(self):
-
-        self.pointer_to_jewelBusd_contract = w3.eth.contract(
-            address= Web3.toChecksumAddress(self.list_contracts['jewel-busd-lp']['address']),
-            abi=self.list_contracts['jewel-busd-lp']['abi'])
+        self.pointer_to_lp_contract = w3.eth.contract(
+            address= Web3.toChecksumAddress(lp_contract['address']),
+            abi=lp_contract['abi'])
 
         self.pointer_to_router_contract = w3.eth.contract(
-            address= Web3.toChecksumAddress( self.list_contracts['router']['address'] ),
-            abi=self.list_contracts['router']['abi'])
+            address= Web3.toChecksumAddress( router_contract['address'] ),
+            abi=router_contract['abi'])
 
     def get_base_token_price(self):
 
-        [jewel_amount ,busd_amount ,_] = self.pointer_to_jewelBusd_contract.getReserves().call()
-        jewel_busd_price = busd_amount / jewel_amount 
+        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.getReserves().call()
+        base_token_price = qute_token_amount / base_token_amount 
 
-        return jewel_busd_price
+        return base_token_price
 
     def get_quote_token_price(self):
 
-        [jewel_amount ,busd_amount ,_] = self.pointer_to_jewelBusd_contract.getReserves().call()
-        busd_jewel_price = jewel_amount / busd_amount
+        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.getReserves().call()
+        qute_token_price = base_token_amount / qute_token_amount
 
-        return busd_jewel_price
+        return qute_token_price
 
     def get_deadLine(self):
 
         return int(time()) + 10 * 60
 
+    def calcute_quote_token_with_slippage(self):
+
+        [base_token_amount ,qute_token_amount ,_] = self.pointer_to_lp_contract.getReserves().call()
+        quote_token_price = qute_token_amount / base_token_amount
+        quote_token_amount = int(base_token_amount * quote_token_price ) 
+
+        min_quote_token_amount = (1 - self.slippage) * quote_token_amount
+
+        return min_quote_token_amount
+
     def buy_base_token(self, base_token_amount):
 
-        deadLine  = self.get_deadLine()
-        quote_token_amount = int(base_token_amount * self.get_base_token_price())
-        min_quote_token_amount = (1 - self.slippage) * quote_token_amount
+        min_quote_token_amount = self.calcute_quote_token_with_slippage()
+
+        return self._make_trade(
+            fn_identifier='swapExactTokensForTokens',
+            input_token_amount= base_token_amount,
+            output_token_amount= min_quote_token_amount)
 
     def sell_base_token(self, base_token_amount):
 
+        min_quote_token_amount = self.calcute_quote_token_with_slippage()
+
+        return self._make_trade(
+            fn_identifier='swapTokensForExactTokens',
+            input_token_amount= min_quote_token_amount,
+            output_token_amount= base_token_amount)
+
+    def _make_trade(
+        self,
+        fn_identifier,
+        input_token_amount,
+        output_token_amount
+        ):
+            
         deadLine  = self.get_deadLine() 
-        quote_token_amount = int(base_token_amount * self.get_base_token_price()) 
-        min_quote_token_amount = (1 - self.slippage) * quote_token_amount
+        
+        args = (
+            input_token_amount,
+            output_token_amount,
+            [
+                Web3.toChecksumAddress(self.base_token_address),
+                Web3.toChecksumAddress(self.quote_token_address)
+            ],
+            Web3.toChecksumAddress(self.public_address),
+            daedLine
+                )
+
+        fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,w3.codec ,fn_identifier ,args ,())
+
+        rawData = prepare_transaction(
+                            account_handler.getAddress(), 
+                            w3,
+                            fn_identifier=fn_identifier,
+                            contract_abi=self.pointer_to_router_contract.abi,
+                            fn_abi=fn_abi,
+                            transaction={'to': self.pointer_to_lp_contract.address},
+                            fn_args=args,
+                            fn_kwargs=() ) 
+
+        utl = Utils()
+        nonce = account.get_account_nonce(account_handler.getAddress() ,block_num='latest' ,endpoint= utl.get_network() )
+
+        tx = {  
+            'chainId': 1,
+            'from': account_handler.getAddress(),
+            'gas': utl.configs['gas_limit'],
+            'gasPrice': utl.configs['gas_price'],
+            'data': rawData['data'],
+            'nonce': nonce,
+            'shardID': 0,
+            'to': rawData['to'],
+            'toShardID': 0,
+            'value': 0
+            }
+
+        rawTx = signing.sign_transaction(tx, account_handler.getPri()).rawTransaction.hex()
+        resp_hash = transaction.send_raw_transaction(rawTx, utl.get_network() )
+
 

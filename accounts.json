@@ -1,0 +1,8 @@
+[
+    {   
+        "public" :"" ,
+        "private":"AES in cryptography.Fernet",
+        "api_key":"AES in cryptography.Fernet",
+        "api_secret":"AES in cryptography.Fernet"
+    }
+]

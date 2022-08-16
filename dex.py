@@ -15,10 +15,10 @@ quote currency : usdt
 
 class DexTrade :
 
-    def __init__(self, web3, account_keys,
-        base_token_address, quote_token_address,
+    def __init__(self, endpoint, account_keys,
+        base_token_address, quote_token_address, 
         lp_contract, router_contract, slippage= 0.005,
-        gas_limit= 10165700, gsa_price= 120*10**9 ,):
+        gas_limit= 10165700, gsa_price= 120*10**9):
 
         self.base_token_address = base_token_address
         self.quote_token_address = quote_token_address
@@ -28,8 +28,8 @@ class DexTrade :
         self.gas_limit = gas_limit
         self.gas_price = gsa_price
 
-        self.w3 = web3
-
+        self.w3 = Web3(Web3.HTTPProvider(self.endpoint))
+        
         self.pointer_to_lp_contract = self.w3.eth.contract(
             address= Web3.toChecksumAddress(lp_contract['address']),
             abi=lp_contract['abi'])
@@ -103,11 +103,11 @@ class DexTrade :
             Web3.toChecksumAddress(self.account_keys.public_key),
             deadLine
                 )  
-        fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,self.w3.codec ,fn_identifier ,args ,())
+        fn_abi = find_matching_fn_abi( self.pointer_to_router_contract.abi ,Web3.codec ,fn_identifier ,args ,())
 
         rawData = prepare_transaction(
                             self.account_keys.public_key, 
-                            self.w3,
+                            Web3,
                             fn_identifier=fn_identifier,
                             contract_abi=self.pointer_to_router_contract.abi,
                             fn_abi=fn_abi,

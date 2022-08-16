@@ -26,7 +26,10 @@ class Arbitration:
     def __init__(self):
         pass
 
+    def main(self):
+        pass
 
+    
 if __name__ == '__main__':
 
     load_dotenv()
@@ -37,14 +40,13 @@ if __name__ == '__main__':
     exchange_balance = ExchanceBalance(account_keys)
 
     list_contracts = load_contracs()
-    w3 = Web3(Web3.HTTPProvider('https://api.s0.t.hmny.io'))
     dex = DexTrade(
-        web3= w3,
+        endpoint= 'https://api.s0.t.hmny.io',
         account_keys= account_keys,
         base_token_address= '0x72cb10c6bfa5624dd07ef608027e366bd690048f',
         quote_token_address= '0xe176ebe47d621b984a73036b9da5d834411ef734',
         lp_contract= list_contracts['jewel-busd-lp'],
-        router_contract= list_contracts['router'],
+        router_contract= list_contracts['router']
         )
 
     exchange = Exchange(account= account_keys)

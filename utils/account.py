@@ -21,30 +21,27 @@ class Account :
 
     def __init__(self, password):
         
-        self.ls_accounts = []
         self.password = password
         self._read_accounts()
 
     def _read_accounts(self ):
 
         try :
-            with open('./dexUtils/accounts.json' ,'r') as fi:
+            with open('./accounts.json' ,'r') as fi:
                 ls_account = json.load(fi)    
 
         except Exception as e:
             logging.error(f'!! error in file accounts.json [{e}]')    
             exit(0)
 
-        if md5(json.dumps(ls_account).encode()).hexdigest() != self.preHash:
 
-            self.ls_accounts = self.decode(ls_account)
+        self.decode(ls_account)
 
-            self.preHash = md5(json.dumps(ls_account).encode()).hexdigest()
-            logging.info('- accounts updated.')
+        logging.info('- accounts updated.')
 
     def _decode(self ,ls_account):
         
-        salt = b'fuckup_' 
+        salt = b'fuckoff_' 
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -54,41 +51,26 @@ class Account :
         )
 
         key = base64.urlsafe_b64encode(kdf.derive(self.password) )
-
-        decode_accounts = []
-        for index ,acc in enumerate(ls_account) :
             
-            if re := {'name', 'pub', 'pri'} - set(acc.keys()) :
-                
-                logging.error(f"!! can't found keys{re} in index account [{index}]")
-                
-                continue
-                
-            name_acc = acc['name']
-            pub = ''
-            pri = ''
+        if re := {'api_secret', 'public', 'private', 'api_key'} - set(ls_account[0].keys()) :
             
-            try :
-                
-                pub = Web3.toChecksumAddress(acc['pub'])
+            logging.error(f"!! can't found keys{re} in index account [{index}]")
+            exit(0) 
 
-            except Exception as e:
-                
-                logging.error(f"!! error in public address [{name_acc}] -> [{e}]")
-                continue
+        
+        try :
+            
+            self.__public_key = Web3.toChecksumAddress(ls_account[0]['public'])
+            self.__private_key = Fernet(key).decrypt(ls_account[0]['private'].encode()).decode()
+            self.__api_secret = Fernet(key).decrypt(ls_account[0]['api_secret'].encode()).decode()
+            self.__api_key = Fernet(key).decrypt(ls_account[0]['api_key'].encode()).decode()
 
-            try :
-                
-                pri = Fernet(key).decrypt(acc['pri'].encode()).decode()
+            logging.info(f"- successfully update new account [{name_acc}]")
 
-                new_acc = {'pub' : pub ,'name':name_acc ,'pri': pri}
-                decode_accounts.append(new_acc)
-                logging.info(f"- successfully added new account [{name_acc}]")
-                
-            except Exception as e:
-                logging.error(f"!! can't decode private key [{name_acc}] -> [{e}]")
-    
-        return decode_accounts
+        except Exception as e:
+            
+            logging.error(f"!! error in decode account fields -> [{e}]")
+            exit(0)
     
     @property.getter
     def private_key(self):

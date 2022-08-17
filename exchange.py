@@ -1,13 +1,15 @@
-from mexc_sdk import Market ,Spot
-
+import ccxt
 
 class Exchange:
 
     def __init__(self, account_handler, symbol):
         
-        self.account_handler = account_handler
+        self.mexc = ccxt.mexc({
+            'apiKey': account_handler.api_key,
+            'secret': account_handler.api_secret
+        }) 
+
         self.symbol = symbol
-        self.market = Market(api_key=self.account_handler.api_key, api_secret=self.account_handler.api_secret)
 
     def buy_base_token(self):
         pass
@@ -17,12 +19,14 @@ class Exchange:
 
     def get_order_book(self ,limit=3):
 
-        resp = client.depth(symbol= self.symbol ,options={ 'limit': limit })
-        return resp
+        # resp = self.mexc.depth(symbol= self.symbol ,options={ 'limit': limit })
+        # return resp
+        pass
 
     def get_current_price(self):
         
-        resp = client.ticker_price(symbol= self.symbol)
-        return resp
+        pass
+        # resp = client.ticker_price(symbol= self.symbol)
+        # return resp
 
 
